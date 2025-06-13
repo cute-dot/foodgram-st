@@ -66,8 +66,16 @@ class RecipeCreateSerializer(RecipeSerializer):
         child=serializers.DictField(
             child=serializers.IntegerField(min_value=1)
         ),
+        required=True,
         write_only=True
     )
+
+    def validate(self, attrs):        
+        if not self.instance and 'ingredients' not in attrs:
+            raise serializers.ValidationError(
+                {"ingredients": "This field is required."}
+            )
+        return super().validate(attrs)
 
     def validate_ingredients(self, value):
         if not value:

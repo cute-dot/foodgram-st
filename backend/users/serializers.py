@@ -12,7 +12,13 @@ class SetPasswordSerializer(serializers.Serializer):
         if not user.check_password(value):
             raise serializers.ValidationError("Неверный текущий пароль.")
         return value
-    
+
+    def validate_new_password(self, value):
+        if len(value) < 8:
+            raise serializers.ValidationError("Новый пароль должен содержать минимум 8 символов.")
+        return value
+
+
 class CustomUserCreateSerializer(UserCreateSerializer):
     class Meta:
         model = CustomUser
@@ -106,7 +112,7 @@ class FollowSerializer(serializers.ModelSerializer):
                 recipes = recipes[:int(recipes_limit)]
             except ValueError:
                 pass
-        return RecipeMinifiedSerializer(recipes, many=True).data
+        return RecipeMinifiedSerializer(recipes, many=True, context={'request': request}).data
 
     def get_recipes_count(self, obj):
         return obj.author.recipes.count()

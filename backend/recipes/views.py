@@ -7,8 +7,6 @@ from django.db.models import Sum
 from django.http import HttpResponse
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
 from io import BytesIO
 from .models import Recipe, Ingredient, IngredientInRecipe, Favorite, ShoppingCart, ShortLink
 from .serializers import RecipeSerializer, RecipeCreateSerializer, RecipeMinifiedSerializer, IngredientSerializer
@@ -16,6 +14,7 @@ from .filters import RecipeFilter
 from .permissions import IsAuthorOrReadOnly
 from django.urls import reverse
 from django_filters.rest_framework import DjangoFilterBackend
+import shortuuid
 
 
 class RecipeViewSet(viewsets.ModelViewSet):
@@ -23,6 +22,11 @@ class RecipeViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthorOrReadOnly]
     filterset_class = RecipeFilter
     filter_backends = [DjangoFilterBackend]
+
+    def get_permissions(self):
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            return [IsAuthenticated()]
+        return [IsAuthorOrReadOnly()]
 
     def get_serializer_class(self):
         if self.action in ['create', 'update', 'partial_update']:
@@ -45,8 +49,25 @@ class RecipeViewSet(viewsets.ModelViewSet):
             Favorite.objects.create(user=request.user, recipe=recipe)
             serializer = RecipeMinifiedSerializer(recipe)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
+        if not Favorite.objects.filter(user=request.user, recipe=recipe).exists():
+            return Response(
+                {'errors': 'Рецепт не в избранном'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
         Favorite.objects.filter(user=request.user, recipe=recipe).delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=True, methods=['get'], permission_classes=[AllowAny])
+    def get_link(self, request, pk=None):
+        recipe = self.get_object()
+        short_link, created = ShortLink.objects.get_or_create(
+            recipe=recipe,
+            defaults={'short_code': shortuuid.uuid()[:8]}
+        )
+        url = request.build_absolute_uri(
+            reverse('short-link-redirect', args=[short_link.short_code])
+        )
+        return Response({'short-link': url})
 
     @action(
         methods=['post', 'delete'],
@@ -64,6 +85,11 @@ class RecipeViewSet(viewsets.ModelViewSet):
             ShoppingCart.objects.create(user=request.user, recipe=recipe)
             serializer = RecipeMinifiedSerializer(recipe)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
+        if not ShoppingCart.objects.filter(user=request.user, recipe=recipe).exists():
+            return Response(
+                {'errors': 'Рецепт не в списке покупок'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
         ShoppingCart.objects.filter(user=request.user, recipe=recipe).delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -83,8 +109,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
 
         buffer = BytesIO()
         p = canvas.Canvas(buffer, pagesize=A4)
-        pdfmetrics.registerFont(TTFont('DejaVuSans', 'backend/static/fonts/DejaVuSans.ttf'))
-        p.setFont('DejaVuSans', 14)
+        p.setFont('Helvetica', 14)
 
         p.drawString(100, 800, 'Список покупок')
         y = 750
@@ -97,7 +122,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
             y -= 30
             if y < 50:
                 p.showPage()
-                p.setFont('DejaVuSans', 14)
+                p.setFont('Helvetica', 14)
                 y = 750
 
         p.showPage()
@@ -112,20 +137,6 @@ class RecipeViewSet(viewsets.ModelViewSet):
             'attachment; filename="shopping_cart.pdf"'
         )
         return response
-
-    @action(
-        methods=['get'],
-        detail=True,
-        permission_classes=[AllowAny]
-    )
-    def get_link(self, request, pk=None):
-        recipe = get_object_or_404(Recipe, pk=pk)
-        short_link, created = ShortLink.objects.get_or_create(recipe=recipe)
-        short_url = request.build_absolute_uri(
-            reverse('short-link-redirect', kwargs={'short_code': short_link.short_code})
-        )
-        return Response({'short-link': short_url}, status=status.HTTP_200_OK)
-
 
 class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Ingredient.objects.all()

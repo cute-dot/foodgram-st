@@ -1,5 +1,6 @@
 from django.db import models
 from users.models import CustomUser
+import uuid
 
 
 class Ingredient(models.Model):
@@ -20,7 +21,6 @@ class Recipe(models.Model):
 
     def __str__(self):
         return self.name
-
 
 class IngredientInRecipe(models.Model):
     recipe = models.ForeignKey(Recipe, on_delete=models.CASCADE)
@@ -48,8 +48,9 @@ class ShoppingCart(models.Model):
 
 
 class ShortLink(models.Model):
-    recipe = models.OneToOneField(Recipe, on_delete=models.CASCADE)
+    recipe = models.ForeignKey(Recipe, on_delete=models.CASCADE)
     short_code = models.CharField(max_length=10, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return self.short_code
+        return f'Short link for {self.recipe.name}'

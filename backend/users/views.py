@@ -1,5 +1,4 @@
 from rest_framework import viewsets, status
-from rest_framework import serializers
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
@@ -8,6 +7,8 @@ from django.contrib.auth import update_session_auth_hash
 from .models import CustomUser, Follow
 from .serializers import CustomUserSerializer, CustomUserCreateSerializer, FollowSerializer, SetPasswordSerializer
 from .fields import Base64ImageField
+from rest_framework.pagination import LimitOffsetPagination
+from rest_framework import serializers
 
 
 class CustomUserViewSet(viewsets.ModelViewSet):
@@ -49,7 +50,7 @@ class CustomUserViewSet(viewsets.ModelViewSet):
         user = request.user
         user.set_password(serializer.validated_data['new_password'])
         user.save()
-        update_session_auth_hash(request, user)  # Сохраняем сессию
+        update_session_auth_hash(request, user)
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(
@@ -112,10 +113,13 @@ class CustomUserViewSet(viewsets.ModelViewSet):
     )
     def subscriptions(self, request):
         follows = Follow.objects.filter(user=request.user)
+        paginator = LimitOffsetPagination()
+        paginator.default_limit = 6
+        result_page = paginator.paginate_queryset(follows, request)
         serializer = FollowSerializer(
-            follows, many=True, context={'request': request}
+            result_page, many=True, context={'request': request}
         )
-        return Response(serializer.data)
+        return paginator.get_paginated_response(serializer.data)
 
     @action(
         methods=['put', 'delete'],
