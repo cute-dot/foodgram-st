@@ -24,14 +24,24 @@ class RecipeViewSet(viewsets.ModelViewSet):
     filter_backends = [DjangoFilterBackend]
 
     def get_permissions(self):
-        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+        if self.action in ['create', 'favorite', 'shopping_cart']:
             return [IsAuthenticated()]
-        return [IsAuthorOrReadOnly()]
+        elif self.action in ['update', 'partial_update', 'destroy']:
+            return [IsAuthenticated(), IsAuthorOrReadOnly()]
+        return super().get_permissions()
 
     def get_serializer_class(self):
         if self.action in ['create', 'update', 'partial_update']:
             return RecipeCreateSerializer
         return RecipeSerializer
+
+    def destroy(self, request, *args, **kwargs):
+        try:
+            instance = self.get_object()
+            self.perform_destroy(instance)
+        except Http404:
+            pass
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(
         methods=['post', 'delete'],
@@ -39,6 +49,11 @@ class RecipeViewSet(viewsets.ModelViewSet):
         permission_classes=[IsAuthenticated]
     )
     def favorite(self, request, pk=None):
+        if not request.user.is_authenticated:
+            return Response(
+                {'detail': 'Требуется аутентификация.'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
         recipe = get_object_or_404(Recipe, pk=pk)
         if request.method == 'POST':
             if Favorite.objects.filter(user=request.user, recipe=recipe).exists():
@@ -75,6 +90,11 @@ class RecipeViewSet(viewsets.ModelViewSet):
         permission_classes=[IsAuthenticated]
     )
     def shopping_cart(self, request, pk=None):
+        if not request.user.is_authenticated:
+            return Response(
+                {'detail': 'Требуется аутентификация.'},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
         recipe = get_object_or_404(Recipe, pk=pk)
         if request.method == 'POST':
             if ShoppingCart.objects.filter(user=request.user, recipe=recipe).exists():
