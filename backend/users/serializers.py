@@ -14,12 +14,25 @@ class CustomUserCreateSerializer(UserCreateSerializer):
             'password'
         )
         extra_kwargs = {
-            'password': {'write_only': True}
+            'password': {'write_only': True},
+            'email': {'required': True},
+            'username': {'required': True},
+            'first_name': {'required': True},
+            'last_name': {'required': True},
         }
 
     def create(self, validated_data):
         user = CustomUser.objects.create_user(**validated_data)
         return user
+
+    def to_representation(self, instance):
+        return {
+            'id': instance.id,
+            'email': instance.email,
+            'username': instance.username,
+            'first_name': instance.first_name,
+            'last_name': instance.last_name
+        }
 
 
 class CustomUserSerializer(UserSerializer):
@@ -71,10 +84,10 @@ class FollowSerializer(serializers.ModelSerializer):
         )
 
     def get_is_subscribed(self, obj):
-        return True  
+        return True
 
     def get_recipes(self, obj):
-        from recipes.serializers import RecipeMinifiedSerializer  
+        from recipes.serializers import RecipeMinifiedSerializer
         request = self.context.get('request')
         recipes = obj.author.recipes.all()
         recipes_limit = request.query_params.get('recipes_limit')
