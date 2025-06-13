@@ -5,9 +5,7 @@ from rest_framework.response import Response
 from django.shortcuts import get_object_or_404, redirect
 from django.db.models import Sum
 from django.http import HttpResponse
-from reportlab.pdfgen import canvas
-from reportlab.lib.pagesizes import A4
-from io import BytesIO
+from django.http import Http404
 from .models import Recipe, Ingredient, IngredientInRecipe, Favorite, ShoppingCart, ShortLink
 from .serializers import RecipeSerializer, RecipeCreateSerializer, RecipeMinifiedSerializer, IngredientSerializer
 from .filters import RecipeFilter
@@ -15,6 +13,7 @@ from .permissions import IsAuthorOrReadOnly
 from django.urls import reverse
 from django_filters.rest_framework import DjangoFilterBackend
 import shortuuid
+import traceback
 
 
 class RecipeViewSet(viewsets.ModelViewSet):
@@ -36,7 +35,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
         return RecipeSerializer
 
     def update(self, request, *args, **kwargs):
-        print(f"Requested recipe ID: {kwargs.get('pk')}")  # Отладка
+        print(f"Requested recipe ID: {kwargs.get('pk')}")
         print(f"Available recipes: {list(Recipe.objects.values_list('id', flat=True))}")
         return super().update(request, *args, **kwargs)
 
@@ -71,15 +70,31 @@ class RecipeViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['get'], permission_classes=[AllowAny])
     def get_link(self, request, pk=None):
-        recipe = self.get_object()
-        short_link, created = ShortLink.objects.get_or_create(
-            recipe=recipe,
-            defaults={'short_code': shortuuid.uuid()[:8]}
-        )
-        url = request.build_absolute_uri(
-            reverse('short-link-redirect', args=[short_link.short_code])
-        )
-        return Response({'short-link': url})
+        print(f"Requested recipe ID: {pk}")
+        try:
+            recipe = Recipe.objects.get(pk=pk)
+            print(f"Found recipe: {recipe.id}, {recipe.name}")
+            short_link, created = ShortLink.objects.get_or_create(
+                recipe=recipe,
+                defaults={'short_code': shortuuid.uuid()[:8]}
+            )
+            url = request.build_absolute_uri(
+                reverse('short-link-redirect', args=[short_link.short_code])
+            )
+            print(f"Generated short link: {url}")
+            return Response({'short-link': url})
+        except Recipe.DoesNotExist:
+            print(f"Recipe with ID {pk} not found")
+            return Response(
+                {"detail": "Рецепт не найден"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            print(f"Error in get_link: {str(e)}")
+            return Response(
+                {"detail": "Ошибка при генерации ссылки"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
     @action(
         methods=['post', 'delete'],
@@ -116,44 +131,47 @@ class RecipeViewSet(viewsets.ModelViewSet):
         permission_classes=[IsAuthenticated]
     )
     def download_shopping_cart(self, request):
-        ingredients = IngredientInRecipe.objects.filter(
-            recipe__in_shopping_cart__user=request.user
-        ).values(
-            'ingredient__name', 'ingredient__measurement_unit'
-        ).annotate(
-            total_amount=Sum('amount')
-        )
-
-        buffer = BytesIO()
-        p = canvas.Canvas(buffer, pagesize=A4)
-        p.setFont('Helvetica', 14)
-
-        p.drawString(100, 800, 'Список покупок')
-        y = 750
-        for item in ingredients:
-            text = (
-                f"{item['ingredient__name']} - "
-                f"{item['total_amount']} {item['ingredient__measurement_unit']}"
+        try:
+            print(f"User: {request.user}")
+            ingredients = IngredientInRecipe.objects.filter(
+                recipe__in_shopping_cart__user=request.user
+            ).values(
+                'ingredient__name', 'ingredient__measurement_unit'
+            ).annotate(
+                total_amount=Sum('amount')
             )
-            p.drawString(100, y, text)
-            y -= 30
-            if y < 50:
-                p.showPage()
-                p.setFont('Helvetica', 14)
-                y = 750
+            print(f"Ingredients: {list(ingredients)}")
 
-        p.showPage()
-        p.save()
-        buffer.seek(0)
+            if not ingredients:
+                return Response(
+                    {"detail": "Список покупок пуст."},
+                    status=status.HTTP_200_OK,
+                    content_type='application/json'
+                )
 
-        response = HttpResponse(
-            content_type='application/pdf',
-            content=buffer.getvalue()
-        )
-        response['Content-Disposition'] = (
-            'attachment; filename="shopping_cart.pdf"'
-        )
-        return response
+            content = "Список покупок\n\n"
+            for item in ingredients:
+                content += (
+                    f"{item['ingredient__name']} - "
+                    f"{item['total_amount']} {item['ingredient__measurement_unit']}\n"
+                )
+
+            response = HttpResponse(
+                content_type='text/plain; charset=utf-8',
+                content=content.encode('utf-8')
+            )
+            response['Content-Disposition'] = (
+                'attachment; filename="shopping_cart.txt"'
+            )
+            return response
+
+        except Exception as e:
+            print(f"Error in download_shopping_cart: {str(e)}")
+            print(traceback.format_exc())
+            return Response(
+                {"detail": "Ошибка при генерации файла."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = Ingredient.objects.all()
@@ -172,5 +190,5 @@ class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 def short_link_redirect(request, short_code):
-    short_link = get_object_or_404(ShortLink, short_code=short_code)
-    return redirect(f'/recipes/{short_link.recipe.id}/')
+    recipe = get_object_or_404(Recipe, id=short_code)
+    return redirect(f'/recipes/{recipe.id}/')
