@@ -35,13 +35,10 @@ class RecipeViewSet(viewsets.ModelViewSet):
             return RecipeCreateSerializer
         return RecipeSerializer
 
-    def destroy(self, request, *args, **kwargs):
-        try:
-            instance = self.get_object()
-            self.perform_destroy(instance)
-        except Http404:
-            pass
-        return Response(status=status.HTTP_204_NO_CONTENT)
+    def update(self, request, *args, **kwargs):
+        print(f"Requested recipe ID: {kwargs.get('pk')}")  # Отладка
+        print(f"Available recipes: {list(Recipe.objects.values_list('id', flat=True))}")
+        return super().update(request, *args, **kwargs)
 
     @action(
         methods=['post', 'delete'],
