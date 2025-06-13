@@ -13,10 +13,14 @@ class RecipeFilter(filters.FilterSet):
 
     def filter_is_favorited(self, queryset, name, value):
         if value and self.request.user.is_authenticated:
+            print(f"Favorited filter: user={self.request.user}, value={value}")  # Отладка
             return queryset.filter(favorites__user=self.request.user)
         return queryset
 
     def filter_is_in_shopping_cart(self, queryset, name, value):
         if value and self.request.user.is_authenticated:
-            return queryset.filter(in_cart__user=self.request.user)
+            print(f"Shopping cart filter: user={self.request.user}, value={value}")  # Отладка
+            filtered_qs = queryset.filter(in_shopping_cart__user=self.request.user)
+            print(f"Filtered recipes: {[r.id for r in filtered_qs]}")  # Отладка
+            return filtered_qs
         return queryset

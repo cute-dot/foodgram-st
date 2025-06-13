@@ -41,7 +41,7 @@ class Favorite(models.Model):
 
 class ShoppingCart(models.Model):
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='in_cart')
-    recipe = models.ForeignKey(Recipe, on_delete=models.CASCADE, related_name='in_cart')
+    recipe = models.ForeignKey(Recipe, on_delete=models.CASCADE, related_name='in_shopping_cart')
 
     class Meta:
         unique_together = ('user', 'recipe')

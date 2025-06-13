@@ -57,7 +57,7 @@ class RecipeSerializer(serializers.ModelSerializer):
         request = self.context.get('request')
         return (
             request and request.user.is_authenticated and
-            obj.in_cart.filter(user=request.user).exists()
+            obj.in_shopping_cart.filter(user=request.user).exists()
         )
 
 
@@ -70,10 +70,14 @@ class RecipeCreateSerializer(RecipeSerializer):
         write_only=True
     )
 
-    def validate(self, attrs):        
-        if not self.instance and 'ingredients' not in attrs:
+    def validate(self, attrs):
+        if 'ingredients' not in attrs:
             raise serializers.ValidationError(
                 {"ingredients": "This field is required."}
+            )
+        if 'ingredients' in attrs and not attrs['ingredients']:
+            raise serializers.ValidationError(
+                {"ingredients": "Ingredients cannot be empty."}
             )
         return super().validate(attrs)
 
@@ -127,7 +131,7 @@ class RecipeCreateSerializer(RecipeSerializer):
     def update(self, instance, validated_data):
         ingredients_data = validated_data.pop('ingredients', None)
         instance = super().update(instance, validated_data)
-        if ingredients_data:
+        if ingredients_data is not None:
             instance.ingredients.clear()
             for ingredient_data in ingredients_data:
                 IngredientInRecipe.objects.create(
