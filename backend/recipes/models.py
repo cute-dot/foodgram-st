@@ -1,6 +1,7 @@
 from django.db import models
 from users.models import CustomUser
 import uuid
+import shortuuid
 
 
 class Ingredient(models.Model):
@@ -47,10 +48,6 @@ class ShoppingCart(models.Model):
         unique_together = ('user', 'recipe')
 
 
-class ShortLink(models.Model):
-    recipe = models.ForeignKey(Recipe, on_delete=models.CASCADE)
-    short_code = models.CharField(max_length=10, unique=True)
-    created_at = models.DateTimeField(auto_now_add=True)
+def generate_short_code():
+    return shortuuid.uuid()[:8]
 
-    def __str__(self):
-        return f'Short link for {self.recipe.name}'

@@ -28,8 +28,8 @@ router.register(r'recipes', RecipeViewSet, basename='recipes')
 router.register(r'ingredients', IngredientViewSet, basename='ingredients')
 
 urlpatterns = [
+    path('s/<int:recipe_id>/', short_link_redirect, name='recipe-short-link'),
     path('admin/', admin.site.urls),
     path('api/', include(router.urls)),
     path('api/auth/', include('djoser.urls.authtoken')),
-    path('s/<str:short_code>/', short_link_redirect, name='short-link-redirect'),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

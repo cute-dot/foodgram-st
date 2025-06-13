@@ -4,15 +4,13 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404, redirect
 from django.db.models import Sum
-from django.http import HttpResponse
-from django.http import Http404
-from .models import Recipe, Ingredient, IngredientInRecipe, Favorite, ShoppingCart, ShortLink
+from django.http import HttpResponse, Http404
+from .models import Recipe, Ingredient, IngredientInRecipe, Favorite, ShoppingCart
 from .serializers import RecipeSerializer, RecipeCreateSerializer, RecipeMinifiedSerializer, IngredientSerializer
 from .filters import RecipeFilter
 from .permissions import IsAuthorOrReadOnly
 from django.urls import reverse
 from django_filters.rest_framework import DjangoFilterBackend
-import shortuuid
 import traceback
 
 
@@ -68,22 +66,25 @@ class RecipeViewSet(viewsets.ModelViewSet):
         Favorite.objects.filter(user=request.user, recipe=recipe).delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-    @action(detail=True, methods=['get'], permission_classes=[AllowAny])
+    @action(
+        detail=True,
+        methods=['get'],
+        url_path='get-link',
+        permission_classes=[AllowAny]
+    )
     def get_link(self, request, pk=None):
-        print(f"Requested recipe ID: {pk}")
         try:
-            recipe = Recipe.objects.get(pk=pk)
-            print(f"Found recipe: {recipe.id}, {recipe.name}")
-            short_link, created = ShortLink.objects.get_or_create(
-                recipe=recipe,
-                defaults={'short_code': shortuuid.uuid()[:8]}
+            recipe = get_object_or_404(Recipe, id=pk)
+            print(f"Recipe found: {recipe.id}, {recipe.name}")
+            short_link = request.build_absolute_uri(
+                reverse('recipe-short-link', kwargs={'recipe_id': recipe.id})
             )
-            url = request.build_absolute_uri(
-                reverse('short-link-redirect', args=[short_link.short_code])
+            print(f"Generated short link: {short_link}")
+            return Response(
+                {'short-link': short_link},
+                status=status.HTTP_200_OK
             )
-            print(f"Generated short link: {url}")
-            return Response({'short-link': url})
-        except Recipe.DoesNotExist:
+        except Http404:
             print(f"Recipe with ID {pk} not found")
             return Response(
                 {"detail": "Рецепт не найден"},
@@ -189,6 +190,12 @@ class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
         return queryset
 
 
-def short_link_redirect(request, short_code):
-    recipe = get_object_or_404(Recipe, id=short_code)
-    return redirect(f'/recipes/{recipe.id}/')
+def short_link_redirect(request, recipe_id):
+    try:
+        print(f"Redirecting recipe ID: {recipe_id}")
+        recipe = get_object_or_404(Recipe, id=recipe_id)
+        print(f"Found recipe: {recipe.id}, {recipe.name}")
+        return redirect(f'/recipes/{recipe.id}/')
+    except Http404:
+        print(f"Recipe with ID {recipe_id} not found")
+        raise Http404("Recipe not found")
