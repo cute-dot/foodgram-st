@@ -1,10 +1,12 @@
 from rest_framework import viewsets, status
+from rest_framework import serializers
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.shortcuts import get_object_or_404
+from django.contrib.auth import update_session_auth_hash
 from .models import CustomUser, Follow
-from .serializers import CustomUserSerializer, CustomUserCreateSerializer, FollowSerializer
+from .serializers import CustomUserSerializer, CustomUserCreateSerializer, FollowSerializer, SetPasswordSerializer
 from .fields import Base64ImageField
 
 
@@ -20,6 +22,8 @@ class CustomUserViewSet(viewsets.ModelViewSet):
     def get_serializer_class(self):
         if self.action == 'create':
             return CustomUserCreateSerializer
+        elif self.action == 'set_password':
+            return SetPasswordSerializer
         return CustomUserSerializer
 
     def create(self, request, *args, **kwargs):
@@ -32,6 +36,21 @@ class CustomUserViewSet(viewsets.ModelViewSet):
             status=status.HTTP_201_CREATED,
             headers=headers
         )
+
+    @action(
+        methods=['post'],
+        detail=False,
+        permission_classes=[IsAuthenticated],
+        url_path='set_password'
+    )
+    def set_password(self, request):
+        serializer = self.get_serializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+        user = request.user
+        user.set_password(serializer.validated_data['new_password'])
+        user.save()
+        update_session_auth_hash(request, user)  # Сохраняем сессию
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(
         methods=['get', 'post'],

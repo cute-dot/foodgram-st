@@ -2,15 +2,6 @@ from django.db import models
 from users.models import CustomUser
 
 
-class Tag(models.Model):
-    name = models.CharField(max_length=200, unique=True)
-    color = models.CharField(max_length=7)  
-    slug = models.SlugField(max_length=200, unique=True)
-
-    def __str__(self):
-        return self.name
-
-
 class Ingredient(models.Model):
     name = models.CharField(max_length=200)
     measurement_unit = models.CharField(max_length=200)
@@ -25,7 +16,6 @@ class Recipe(models.Model):
     image = models.ImageField(upload_to='recipes/')
     text = models.TextField()
     ingredients = models.ManyToManyField(Ingredient, through='IngredientInRecipe')
-    tags = models.ManyToManyField(Tag)
     cooking_time = models.PositiveIntegerField()
 
     def __str__(self):

@@ -3,6 +3,16 @@ from rest_framework import serializers
 from .models import CustomUser, Follow
 
 
+class SetPasswordSerializer(serializers.Serializer):
+    new_password = serializers.CharField(required=True, min_length=8)
+    current_password = serializers.CharField(required=True)
+
+    def validate_current_password(self, value):
+        user = self.context['request'].user
+        if not user.check_password(value):
+            raise serializers.ValidationError("Неверный текущий пароль.")
+        return value
+    
 class CustomUserCreateSerializer(UserCreateSerializer):
     class Meta:
         model = CustomUser

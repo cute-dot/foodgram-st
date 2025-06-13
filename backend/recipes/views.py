@@ -10,8 +10,8 @@ from reportlab.lib.pagesizes import A4
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from io import BytesIO
-from .models import Recipe, Ingredient, IngredientInRecipe, Favorite, ShoppingCart, ShortLink, Tag
-from .serializers import RecipeSerializer, RecipeCreateSerializer, RecipeMinifiedSerializer, IngredientSerializer, TagSerializer
+from .models import Recipe, Ingredient, IngredientInRecipe, Favorite, ShoppingCart, ShortLink
+from .serializers import RecipeSerializer, RecipeCreateSerializer, RecipeMinifiedSerializer, IngredientSerializer
 from .filters import RecipeFilter
 from .permissions import IsAuthorOrReadOnly
 from django.urls import reverse
@@ -22,6 +22,7 @@ class RecipeViewSet(viewsets.ModelViewSet):
     queryset = Recipe.objects.all()
     permission_classes = [IsAuthorOrReadOnly]
     filterset_class = RecipeFilter
+    filter_backends = [DjangoFilterBackend]
 
     def get_serializer_class(self):
         if self.action in ['create', 'update', 'partial_update']:
@@ -132,7 +133,7 @@ class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [AllowAny]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['name']
-    pagination_class = None  
+    pagination_class = None
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -140,12 +141,6 @@ class IngredientViewSet(viewsets.ReadOnlyModelViewSet):
         if name:
             queryset = queryset.filter(name__istartswith=name)
         return queryset
-
-
-class TagViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = Tag.objects.all()
-    serializer_class = TagSerializer
-    permission_classes = [AllowAny]
 
 
 def short_link_redirect(request, short_code):
