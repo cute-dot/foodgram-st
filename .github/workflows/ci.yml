@@ -78,8 +78,6 @@ jobs:
       with:
         context: ./backend
         push: ${{ github.ref == 'refs/heads/main' }}
-        tags: |
-          ${{ secrets.DOCKER_HUB_USERNAME }}/foodgram-backend:latest
-          ${{ secrets.DOCKER_HUB_USERNAME }}/foodgram-backend:${{ github.sha }}
+        tags: cutedot/foodgram-backend:latest
         cache-from: type=gha
         cache-to: type=gha,mode=max
