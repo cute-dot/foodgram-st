@@ -72,12 +72,16 @@ jobs:
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
-          password: ${{ secrets.DOCKER_HUB_TOKEN }}
-      
+          token: ${{ secrets.DOCKER_HUB_TOKEN }}
+      - name: Debug tags
+        run: |
+          echo "Tags will be:"
+          echo "${{ secrets.DOCKER_HUB_USERNAME }}/foodgram-backend:latest"
+          echo "${{ secrets.DOCKER_HUB_USERNAME }}/foodgram-backend:${{ github.sha }}"
       - name: Build and Push Backend
         uses: docker/build-push-action@v4
         with:
           context: ./backend
           push: true
           tags: |
-            cutedot/foodgram-backend:latest
+            ${{ secrets.DOCKER_HUB_USERNAME }}/foodgram-backend:latest
